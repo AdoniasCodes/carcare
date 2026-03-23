@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/eagleerq/carcare.eagleeyebgp.com/
+    - /bin/cp -R * $DEPLOYPATH
+    - cd $DEPLOYPATH && source /home/eagleerq/nodevenv/carcare.eagleeyebgp.com/*/bin/activate && npm install && npm run build
