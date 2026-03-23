@@ -1,12 +1,15 @@
+import Image from "next/image";
+
 const services = [
   {
     title: "Preventative Maintenance",
     description:
       "Stay ahead of problems. We inspect your vehicle and catch issues before they become expensive repairs.",
     price: "Starting from 8,000 ETB",
+    image: "/images/preventative.jpg",
     icon: (
       <svg
-        className="w-8 h-8"
+        className="w-6 h-6"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -25,9 +28,10 @@ const services = [
     description:
       "Oil changes, filter replacements, brake checks, and more. Regular service to keep your car running smoothly.",
     price: "Starting from 8,000 ETB",
+    image: "/images/routine.jpg",
     icon: (
       <svg
-        className="w-8 h-8"
+        className="w-6 h-6"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -52,9 +56,10 @@ const services = [
     description:
       "Stuck on the road? Flat tire, dead battery, engine trouble — we come to you and get you moving again.",
     price: "Starting from 8,000 ETB",
+    image: "/images/roadside.jpg",
     icon: (
       <svg
-        className="w-8 h-8"
+        className="w-6 h-6"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -75,7 +80,8 @@ export default function Services() {
     <section id="services" className="py-20 sm:py-28 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-primary mb-4">
+          <span className="text-accent font-semibold text-sm uppercase tracking-wider">What We Offer</span>
+          <h2 className="text-3xl sm:text-4xl font-bold text-primary mt-2 mb-4">
             Our Services
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -88,18 +94,39 @@ export default function Services() {
           {services.map((service, index) => (
             <div
               key={index}
-              className="group relative bg-white border border-gray-100 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+              className="group relative bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
             >
-              <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center text-primary mb-6 group-hover:bg-primary group-hover:text-white transition-colors duration-300">
-                {service.icon}
+              {/* Service image */}
+              <div className="relative h-48 overflow-hidden">
+                <Image
+                  src={service.image}
+                  alt={service.title}
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                <div className="absolute bottom-4 left-4 w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-lg">
+                  {service.icon}
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">
-                {service.title}
-              </h3>
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                {service.description}
-              </p>
-              <p className="text-accent font-semibold">{service.price}</p>
+
+              <div className="p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  {service.title}
+                </h3>
+                <p className="text-gray-600 mb-4 leading-relaxed text-sm">
+                  {service.description}
+                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-accent font-semibold text-sm">{service.price}</p>
+                  <span className="text-primary text-sm font-medium group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                    Learn more
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
             </div>
           ))}
         </div>
