@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import getDb from "@/lib/db";
+import { supabase } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,62 +9,80 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = getDb();
     const today = new Date().toISOString().split("T")[0];
     const monthStart = today.substring(0, 7) + "-01";
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const eightWeeksAgo = new Date(Date.now() - 56 * 24 * 60 * 60 * 1000).toISOString();
 
     // Today's bookings
-    const todayCount = db.prepare(
-      "SELECT COUNT(*) as count FROM bookings WHERE date(preferred_date) = date(?)"
-    ).get(today) as { count: number };
+    const { count: todayCount } = await supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true })
+      .eq("preferred_date", today);
 
     // Pending bookings
-    const pendingCount = db.prepare(
-      "SELECT COUNT(*) as count FROM bookings WHERE status = 'pending'"
-    ).get() as { count: number };
+    const { count: pendingCount } = await supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending");
 
-    // This month's revenue
-    const monthRevenue = db.prepare(
-      "SELECT COALESCE(SUM(revenue), 0) as total FROM bookings WHERE status = 'completed' AND created_at >= ?"
-    ).get(monthStart) as { total: number };
+    // This month's completed bookings (for revenue/cost)
+    const { data: monthData } = await supabase
+      .from("bookings")
+      .select("revenue, cost")
+      .eq("status", "completed")
+      .gte("created_at", monthStart);
 
-    // This month's cost
-    const monthCost = db.prepare(
-      "SELECT COALESCE(SUM(cost), 0) as total FROM bookings WHERE status = 'completed' AND created_at >= ?"
-    ).get(monthStart) as { total: number };
+    const monthRevenue = (monthData || []).reduce((sum, b) => sum + (b.revenue || 0), 0);
+    const monthCost = (monthData || []).reduce((sum, b) => sum + (b.cost || 0), 0);
 
     // Total bookings
-    const totalCount = db.prepare(
-      "SELECT COUNT(*) as count FROM bookings"
-    ).get() as { count: number };
+    const { count: totalCount } = await supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true });
 
     // Bookings per day (last 14 days)
-    const dailyBookings = db.prepare(`
-      SELECT date(preferred_date) as date, COUNT(*) as count
-      FROM bookings
-      WHERE preferred_date >= date('now', '-14 days')
-      GROUP BY date(preferred_date)
-      ORDER BY date ASC
-    `).all() as { date: string; count: number }[];
+    const { data: recentBookings } = await supabase
+      .from("bookings")
+      .select("preferred_date")
+      .gte("preferred_date", fourteenDaysAgo);
 
-    // Revenue per week (last 8 weeks)
-    const weeklyRevenue = db.prepare(`
-      SELECT strftime('%Y-W%W', created_at) as week,
-             COALESCE(SUM(revenue), 0) as revenue,
-             COALESCE(SUM(cost), 0) as cost
-      FROM bookings
-      WHERE status = 'completed'
-        AND created_at >= date('now', '-56 days')
-      GROUP BY week
-      ORDER BY week ASC
-    `).all() as { week: string; revenue: number; cost: number }[];
+    const dailyMap: Record<string, number> = {};
+    (recentBookings || []).forEach((b) => {
+      const date = b.preferred_date;
+      dailyMap[date] = (dailyMap[date] || 0) + 1;
+    });
+    const dailyBookings = Object.entries(dailyMap)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Weekly revenue (last 8 weeks)
+    const { data: weeklyData } = await supabase
+      .from("bookings")
+      .select("created_at, revenue, cost")
+      .eq("status", "completed")
+      .gte("created_at", eightWeeksAgo);
+
+    const weeklyMap: Record<string, { revenue: number; cost: number }> = {};
+    (weeklyData || []).forEach((b) => {
+      const d = new Date(b.created_at);
+      const weekStart = new Date(d);
+      weekStart.setDate(d.getDate() - d.getDay());
+      const week = weekStart.toISOString().split("T")[0];
+      if (!weeklyMap[week]) weeklyMap[week] = { revenue: 0, cost: 0 };
+      weeklyMap[week].revenue += b.revenue || 0;
+      weeklyMap[week].cost += b.cost || 0;
+    });
+    const weeklyRevenue = Object.entries(weeklyMap)
+      .map(([week, data]) => ({ week, ...data }))
+      .sort((a, b) => a.week.localeCompare(b.week));
 
     return NextResponse.json({
-      todayBookings: todayCount.count,
-      pendingBookings: pendingCount.count,
-      monthRevenue: monthRevenue.total,
-      monthProfit: monthRevenue.total - monthCost.total,
-      totalBookings: totalCount.count,
+      todayBookings: todayCount || 0,
+      pendingBookings: pendingCount || 0,
+      monthRevenue,
+      monthProfit: monthRevenue - monthCost,
+      totalBookings: totalCount || 0,
       dailyBookings,
       weeklyRevenue,
     });

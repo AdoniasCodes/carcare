@@ -39,10 +39,13 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!stats) {
+  if (!stats || stats.todayBookings === undefined) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-red-500">Failed to load dashboard</p>
+        <div className="text-center">
+          <p className="text-red-500 mb-2">Failed to load dashboard</p>
+          <p className="text-gray-400 text-sm">Database may not be configured for this environment.</p>
+        </div>
       </div>
     );
   }

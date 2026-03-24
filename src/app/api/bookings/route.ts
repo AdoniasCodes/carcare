@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import getDb, { generateId } from "@/lib/db";
+import { supabase, generateId } from "@/lib/db";
 
 // POST — create a new booking (public)
 export async function POST(request: NextRequest) {
@@ -24,13 +24,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid service type" }, { status: 400 });
     }
 
-    const db = getDb();
     const id = generateId();
 
-    db.prepare(`
-      INSERT INTO bookings (id, name, phone, car_make, car_model, car_year, service_type, description, location, preferred_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, name.trim(), cleanPhone, carMake.trim(), carModel.trim(), carYear.trim(), serviceType, description?.trim() || null, location.trim(), preferredDate);
+    const { error } = await supabase.from("bookings").insert({
+      id,
+      name: name.trim(),
+      phone: cleanPhone,
+      car_make: carMake.trim(),
+      car_model: carModel.trim(),
+      car_year: carYear.trim(),
+      service_type: serviceType,
+      description: description?.trim() || null,
+      location: location.trim(),
+      preferred_date: preferredDate,
+    });
+
+    if (error) throw error;
 
     return NextResponse.json({ id, message: "Booking created successfully" }, { status: 201 });
   } catch (error) {
@@ -42,29 +51,26 @@ export async function POST(request: NextRequest) {
 // GET — list bookings (for admin)
 export async function GET(request: NextRequest) {
   try {
-    // Simple auth check via header
     const authHeader = request.headers.get("x-admin-key");
     const adminKey = process.env.ADMIN_KEY || "carcare-admin-2024";
     if (authHeader !== adminKey) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = getDb();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    let query = "SELECT * FROM bookings";
-    const params: string[] = [];
+    let query = supabase.from("bookings").select("*");
 
     if (status && status !== "all") {
-      query += " WHERE status = ?";
-      params.push(status);
+      query = query.eq("status", status);
     }
 
-    query += " ORDER BY created_at DESC";
+    const { data, error } = await query.order("created_at", { ascending: false });
 
-    const bookings = db.prepare(query).all(...params);
-    return NextResponse.json(bookings);
+    if (error) throw error;
+
+    return NextResponse.json(data);
   } catch (error) {
     console.error("Failed to fetch bookings:", error);
     return NextResponse.json({ error: "Failed to fetch bookings" }, { status: 500 });
