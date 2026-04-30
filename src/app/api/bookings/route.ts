@@ -5,7 +5,7 @@ import { supabase, generateId } from "@/lib/db";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, phone, carMake, carModel, carYear, serviceType, preferredDate, location, description } = body;
+    const { name, phone, carMake, carModel, carYear, serviceType, preferredDate, location, description, promoCode } = body;
 
     // Validate required fields
     if (!name?.trim() || !phone?.trim() || !carMake?.trim() || !carModel?.trim() || !carYear?.trim() || !serviceType || !preferredDate || !location?.trim()) {
@@ -37,9 +37,26 @@ export async function POST(request: NextRequest) {
       description: description?.trim() || null,
       location: location.trim(),
       preferred_date: preferredDate,
+      promo_code: promoCode?.trim()?.toUpperCase() || null,
     });
 
     if (error) throw error;
+
+    // Increment promo usage if applied (best-effort)
+    if (promoCode) {
+      const codeUpper = promoCode.trim().toUpperCase();
+      const { data: pc } = await supabase
+        .from("promo_codes")
+        .select("uses_count")
+        .eq("code", codeUpper)
+        .single();
+      if (pc) {
+        await supabase
+          .from("promo_codes")
+          .update({ uses_count: (pc.uses_count || 0) + 1 })
+          .eq("code", codeUpper);
+      }
+    }
 
     return NextResponse.json({ id, message: "Booking created successfully" }, { status: 201 });
   } catch (error) {

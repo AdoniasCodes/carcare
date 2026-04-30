@@ -10,6 +10,10 @@ interface Stats {
   totalBookings: number;
   dailyBookings: { date: string; count: number }[];
   weeklyRevenue: { week: string; revenue: number; cost: number }[];
+  activeSubscriptions: number;
+  pendingSubscriptions: number;
+  subscriptionRevenue: number;
+  subscriptionsByPlan: { silver: number; gold: number; platinum: number };
 }
 
 function formatETB(amount: number): string {
@@ -74,6 +78,31 @@ export default function AdminDashboard() {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* Subscription summary */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm mb-8">
+        <h3 className="font-semibold text-gray-900 mb-4">Subscriptions</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Active</p>
+            <p className="text-2xl font-bold text-green-700">{stats.activeSubscriptions ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Pending</p>
+            <p className="text-2xl font-bold text-amber-600">{stats.pendingSubscriptions ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Revenue (paid)</p>
+            <p className="text-2xl font-bold text-purple-700">{formatETB(stats.subscriptionRevenue ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">By Plan</p>
+            <p className="text-sm text-gray-700">
+              S {stats.subscriptionsByPlan?.silver ?? 0} · G {stats.subscriptionsByPlan?.gold ?? 0} · P {stats.subscriptionsByPlan?.platinum ?? 0}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Daily bookings chart (simple bar visualization) */}

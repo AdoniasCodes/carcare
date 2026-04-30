@@ -77,6 +77,32 @@ export async function GET(request: NextRequest) {
       .map(([week, data]) => ({ week, ...data }))
       .sort((a, b) => a.week.localeCompare(b.week));
 
+    // ── Subscription stats ──────────────────────────────
+    const { count: activeSubsCount } = await supabase
+      .from("subscriptions")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "active");
+
+    const { count: pendingSubsCount } = await supabase
+      .from("subscriptions")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending");
+
+    const { data: paidSubs } = await supabase
+      .from("subscriptions")
+      .select("plan, price, status, payment_status")
+      .eq("payment_status", "paid");
+
+    const subsRevenue = (paidSubs || []).reduce((sum, s) => sum + (s.price || 0), 0);
+
+    const subsByPlan: { silver: number; gold: number; platinum: number } = { silver: 0, gold: 0, platinum: 0 };
+    (paidSubs || []).forEach((s) => {
+      const plan = s.plan as "silver" | "gold" | "platinum";
+      if (plan === "silver" || plan === "gold" || plan === "platinum") {
+        subsByPlan[plan]++;
+      }
+    });
+
     return NextResponse.json({
       todayBookings: todayCount || 0,
       pendingBookings: pendingCount || 0,
@@ -85,6 +111,10 @@ export async function GET(request: NextRequest) {
       totalBookings: totalCount || 0,
       dailyBookings,
       weeklyRevenue,
+      activeSubscriptions: activeSubsCount || 0,
+      pendingSubscriptions: pendingSubsCount || 0,
+      subscriptionRevenue: subsRevenue,
+      subscriptionsByPlan: subsByPlan,
     });
   } catch (error) {
     console.error("Failed to fetch stats:", error);
