@@ -9,3 +9,15 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey);
 export function generateId(): string {
   return "BK-" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
 }
+
+export function generateMechanicId(): string {
+  return "MC-" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 4).toUpperCase();
+}
+
+export function generateSessionToken(): string {
+  return (
+    Date.now().toString(36) +
+    Math.random().toString(36).substring(2) +
+    Math.random().toString(36).substring(2)
+  ).toUpperCase();
+}

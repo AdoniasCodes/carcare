@@ -16,23 +16,56 @@ interface Stats {
   subscriptionsByPlan: { silver: number; gold: number; platinum: number };
 }
 
+interface FieldMechanic {
+  id: string;
+  full_name: string;
+  availability: "available" | "busy" | "off";
+  activeJob: { id: string; name: string; location: string; service_type: string; started_at: string | null } | null;
+}
+
+interface PendingPayment {
+  id: string;
+  name: string;
+  phone: string;
+  revenue: number | null;
+  cash_collected: number | null;
+  payment_method: string | null;
+  completed_at: string | null;
+}
+
+interface FieldActivity {
+  field: FieldMechanic[];
+  openJobs: number;
+  pendingPayments: PendingPayment[];
+}
+
 function formatETB(amount: number): string {
   return new Intl.NumberFormat("en-ET").format(amount) + " ETB";
 }
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [field, setField] = useState<FieldActivity | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const key = localStorage.getItem("admin-key");
-    fetch("/api/stats", {
-      headers: { "x-admin-key": key || "" },
-    })
-      .then((res) => res.json())
-      .then((data) => setStats(data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    const key = localStorage.getItem("admin-key") || "";
+    const headers = { "x-admin-key": key };
+    const load = () => {
+      Promise.all([
+        fetch("/api/stats", { headers }).then((r) => r.json()),
+        fetch("/api/admin/field-activity", { headers }).then((r) => r.json()),
+      ])
+        .then(([s, f]) => {
+          setStats(s);
+          if (f && !f.error) setField(f);
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    };
+    load();
+    const id = setInterval(load, 30000);
+    return () => clearInterval(id);
   }, []);
 
   if (loading) {
@@ -79,6 +112,84 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      {/* Field activity (live) */}
+      {field && (
+        <div className="grid lg:grid-cols-2 gap-4 mb-8">
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Field Activity</h3>
+              <span className="text-xs text-gray-400">live · refreshes every 30s</span>
+            </div>
+            {field.openJobs > 0 && (
+              <div className="mb-3 px-3 py-2 bg-amber-50 text-amber-800 rounded-lg text-sm">
+                ⚠ {field.openJobs} unassigned job{field.openJobs === 1 ? "" : "s"} waiting
+              </div>
+            )}
+            {field.field.length === 0 ? (
+              <p className="text-gray-400 text-sm">No active mechanics</p>
+            ) : (
+              <ul className="space-y-2">
+                {field.field.map((m) => {
+                  const dot =
+                    m.availability === "available"
+                      ? "bg-green-500"
+                      : m.availability === "busy"
+                      ? "bg-amber-500"
+                      : "bg-gray-400";
+                  return (
+                    <li key={m.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50">
+                      <span className={`mt-1.5 inline-block w-2.5 h-2.5 rounded-full ${dot}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{m.full_name}</p>
+                        {m.activeJob ? (
+                          <p className="text-xs text-purple-700 truncate">
+                            🔧 {m.activeJob.name} · {m.activeJob.location}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-500 capitalize">{m.availability}</p>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 className="font-semibold text-gray-900 mb-4">Payment Reminders</h3>
+            {field.pendingPayments.length === 0 ? (
+              <p className="text-gray-400 text-sm">All payments collected ✓</p>
+            ) : (
+              <ul className="space-y-2 max-h-64 overflow-y-auto">
+                {field.pendingPayments.map((p) => {
+                  const owed = (p.revenue || 0) - (p.cash_collected || 0);
+                  return (
+                    <li key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 truncate">{p.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {p.payment_method === "pending" ? "marked pending" : "no payment method"} ·
+                          {p.completed_at ? ` ${new Date(p.completed_at).toLocaleDateString()}` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0 ml-2">
+                        {owed > 0 && (
+                          <p className="text-sm font-semibold text-red-600">{formatETB(owed)} owed</p>
+                        )}
+                        <a href={`tel:${p.phone}`} className="text-xs text-primary underline">
+                          📞 {p.phone}
+                        </a>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Subscription summary */}
       <div className="bg-white rounded-2xl p-6 shadow-sm mb-8">
